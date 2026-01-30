@@ -1,15 +1,22 @@
 import { Product, CreateProductRequest, ProductMetadata } from '../types';
+import { productDatabase } from './database';
+
+// uses sqlite if USE_DB=true, otherwise in-memory
+const USE_DB = process.env.USE_DB === 'true';
 
 class ProductStore {
   private products: Map<number, Product> = new Map();
-  private titleIndex: Set<string> = new Set(); // For duplicate detection
+  private titleIndex: Set<string> = new Set();
   private nextId: number = 1;
 
   add(request: CreateProductRequest): Product | null {
-    // Duplicate detection: normalize title and check
+    if (USE_DB) {
+      return productDatabase.add(request);
+    }
+    
     const normalizedTitle = this.normalizeTitle(request.title);
     if (this.titleIndex.has(normalizedTitle)) {
-      return null; // Duplicate product, skip
+      return null;
     }
     
     const product: Product = {
@@ -38,10 +45,13 @@ class ProductStore {
   }
 
   get(id: number): Product | undefined {
+    if (USE_DB) return productDatabase.get(id);
     return this.products.get(id);
   }
 
   update(id: number, updates: Partial<Product>): Product | undefined {
+    if (USE_DB) return productDatabase.update(id, updates);
+    
     const product = this.products.get(id);
     if (!product) return undefined;
     
@@ -51,6 +61,8 @@ class ProductStore {
   }
 
   updateMetadata(id: number, metadata: ProductMetadata): Product | undefined {
+    if (USE_DB) return productDatabase.updateMetadata(id, metadata);
+    
     const product = this.products.get(id);
     if (!product) return undefined;
     
@@ -60,6 +72,8 @@ class ProductStore {
   }
 
   delete(id: number): boolean {
+    if (USE_DB) return productDatabase.delete(id);
+    
     const product = this.products.get(id);
     if (product) {
       this.titleIndex.delete(this.normalizeTitle(product.title));
@@ -68,20 +82,24 @@ class ProductStore {
   }
 
   getAll(): Product[] {
+    if (USE_DB) return productDatabase.getAll();
     return Array.from(this.products.values());
   }
 
   count(): number {
+    if (USE_DB) return productDatabase.count();
     return this.products.size;
   }
 
   clear(): void {
+    if (USE_DB) { productDatabase.clear(); return; }
     this.products.clear();
     this.titleIndex.clear();
     this.nextId = 1;
   }
 
   bulkAdd(requests: CreateProductRequest[]): Product[] {
+    if (USE_DB) return productDatabase.bulkAdd(requests);
     return requests
       .map(req => this.add(req))
       .filter((p): p is Product => p !== null);

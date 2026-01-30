@@ -6,9 +6,20 @@ import { generateAllProducts } from '../data/seedData';
 import { productStore } from '../models/productStore';
 
 const SCRAPED_DATA_PATH = path.join(__dirname, '..', 'data', 'scrapedProducts.json');
+const USE_DB = process.env.USE_DB === 'true';
 
 // tries to load scraped data first, falls back to synthetic
 export function loadProductData(): CreateProductRequest[] {
+  // if using database and it already has data, skip loading
+  if (USE_DB) {
+    const existingCount = productStore.count();
+    if (existingCount > 0) {
+      console.log(`Database already has ${existingCount} products, skipping load`);
+      return [];
+    }
+    console.log('Database empty, will load initial data...');
+  }
+
   if (fs.existsSync(SCRAPED_DATA_PATH)) {
     try {
       const data = fs.readFileSync(SCRAPED_DATA_PATH, 'utf-8');
