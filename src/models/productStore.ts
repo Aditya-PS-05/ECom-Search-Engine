@@ -2,9 +2,16 @@ import { Product, CreateProductRequest, ProductMetadata } from '../types';
 
 class ProductStore {
   private products: Map<number, Product> = new Map();
+  private titleIndex: Set<string> = new Set(); // For duplicate detection
   private nextId: number = 1;
 
-  add(request: CreateProductRequest): Product {
+  add(request: CreateProductRequest): Product | null {
+    // Duplicate detection: normalize title and check
+    const normalizedTitle = this.normalizeTitle(request.title);
+    if (this.titleIndex.has(normalizedTitle)) {
+      return null; // Duplicate product, skip
+    }
+    
     const product: Product = {
       productId: this.nextId++,
       title: request.title,
@@ -22,7 +29,12 @@ class ProductStore {
       metadata: request.metadata ?? {},
     };
     this.products.set(product.productId, product);
+    this.titleIndex.add(normalizedTitle);
     return product;
+  }
+
+  private normalizeTitle(title: string): string {
+    return title.toLowerCase().trim().slice(0, 80);
   }
 
   get(id: number): Product | undefined {
@@ -48,6 +60,10 @@ class ProductStore {
   }
 
   delete(id: number): boolean {
+    const product = this.products.get(id);
+    if (product) {
+      this.titleIndex.delete(this.normalizeTitle(product.title));
+    }
     return this.products.delete(id);
   }
 
@@ -61,11 +77,18 @@ class ProductStore {
 
   clear(): void {
     this.products.clear();
+    this.titleIndex.clear();
     this.nextId = 1;
   }
 
   bulkAdd(requests: CreateProductRequest[]): Product[] {
-    return requests.map(req => this.add(req));
+    return requests
+      .map(req => this.add(req))
+      .filter((p): p is Product => p !== null);
+  }
+
+  isDuplicate(title: string): boolean {
+    return this.titleIndex.has(this.normalizeTitle(title));
   }
 }
 

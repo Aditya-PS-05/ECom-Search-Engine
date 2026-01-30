@@ -7,6 +7,12 @@ export class ProductService {
   createProduct(request: CreateProductRequest): ApiResponse<{ productId: number }> {
     try {
       const product = productStore.add(request);
+      if (!product) {
+        return {
+          success: false,
+          error: 'Duplicate product: a product with similar title already exists',
+        };
+      }
       return {
         success: true,
         data: { productId: product.productId },
