@@ -48,12 +48,18 @@ export class SearchService {
     let filtered = products;
     
     // Category filter
-    const category = searchQuery.category || queryIntent.intents.category;
-    if (category) {
+    if (searchQuery.category) {
+      // Explicit category filter from query params
       filtered = filtered.filter(p => 
-        p.metadata.category?.toLowerCase() === category.toLowerCase()
+        p.metadata.category?.toLowerCase() === searchQuery.category!.toLowerCase()
+      );
+    } else if (queryIntent.intents.category === 'accessory') {
+      // For accessory searches (cover, charger, etc.), apply category filter
+      filtered = filtered.filter(p => 
+        p.metadata.category?.toLowerCase() === 'accessory'
       );
     }
+    // Note: For phone/laptop categories detected from brand names, we use ranking boost instead
     
     // Brand filter - only apply if explicitly set in search params, otherwise use for ranking boost
     if (searchQuery.brand) {

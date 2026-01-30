@@ -47,14 +47,27 @@ export class QueryProcessor {
       corrected = corrected.replace(regex, correction);
     }
     
-    // Fuzzy matching for unknown words
+    // Common English words that should NOT be corrected to brands
+    const protectedWords = new Set([
+      'more', 'most', 'best', 'good', 'new', 'old', 'red', 'blue', 'green', 
+      'black', 'white', 'gold', 'silver', 'pink', 'gray', 'grey', 'purple',
+      'big', 'small', 'large', 'mini', 'max', 'pro', 'plus', 'ultra',
+      'cheap', 'budget', 'premium', 'latest', 'strong', 'fast', 'slow',
+      'under', 'below', 'above', 'price', 'rupees', 'storage', 'memory',
+      'color', 'colour', 'cover', 'case', 'charger', 'cable'
+    ]);
+    
+    // Fuzzy matching for unknown words (more conservative)
     const words = corrected.split(/\s+/);
     const correctedWords = words.map(word => {
-      if (word.length < 3) return word;
+      if (word.length < 4) return word; // Only correct longer words
+      if (protectedWords.has(word)) return word; // Don't correct common words
       
-      // Check if word is close to any known brand
-      const closestBrand = this.findClosestMatch(word, BRANDS, 2);
-      if (closestBrand) return closestBrand;
+      // Check if word is close to any known brand (require closer match)
+      const closestBrand = this.findClosestMatch(word, BRANDS, 1);
+      if (closestBrand && closestBrand.length >= word.length - 1) {
+        return closestBrand;
+      }
       
       return word;
     });
@@ -266,11 +279,15 @@ export class QueryProcessor {
                          'latest', 'new', 'best', 'good', 'top', 'under', 'below',
                          'rupees', 'rs', 'price', 'color', 'colour', 'more', 'storage'];
     
+    // Pattern to match price values like "50k", "50000", etc.
+    const pricePattern = /^\d+k?$/i;
+    
     const tokens = query
       .split(/\s+/)
       .filter(token => token.length > 1)
       .filter(token => !stopWords.includes(token))
-      .filter(token => !intentWords.includes(token));
+      .filter(token => !intentWords.includes(token))
+      .filter(token => !pricePattern.test(token)); // Remove price numbers from tokens
     
     return tokens;
   }
