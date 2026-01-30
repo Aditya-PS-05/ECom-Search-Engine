@@ -2,7 +2,7 @@ import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import routes from './routes';
 import { productStore } from './models/productStore';
-import { generateAllProducts } from './data/seedData';
+import { loadProductData, startBackgroundScraping } from './services/dataLoaderService';
 
 const app: Application = express();
 
@@ -90,12 +90,21 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   });
 });
 
-// Initialize data
+// Initialize data synchronously for instant startup
 export function initializeData(): void {
-  console.log('Generating product catalog...');
-  const products = generateAllProducts();
+  console.log('🚀 Initializing product catalog...');
+  console.log('   1) Load from scraped JSON or synthetic data (instant)');
+  console.log('   2) Background scraping adds more products in real-time\n');
+  
+  const products = loadProductData();
   productStore.bulkAdd(products);
-  console.log(`Loaded ${productStore.count()} products into catalog`);
+  
+  console.log(`✅ Loaded ${productStore.count()} products into catalog`);
+  
+  // Start background scraping (non-blocking)
+  if (process.env.ENABLE_SCRAPING !== 'false') {
+    startBackgroundScraping();
+  }
 }
 
 export default app;

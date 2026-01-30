@@ -2,10 +2,10 @@ import app, { initializeData } from './app';
 
 const PORT = process.env.PORT || 3000;
 
-// Initialize product data
+// Initialize data (instant startup + background scraping)
 initializeData();
 
-// Start server
+// Start server immediately
 app.listen(PORT, () => {
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
