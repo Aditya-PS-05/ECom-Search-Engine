@@ -7,28 +7,29 @@ import { productStore } from '../models/productStore';
 
 const SCRAPED_DATA_PATH = path.join(__dirname, '..', 'data', 'scrapedProducts.json');
 
+// tries to load scraped data first, falls back to synthetic
 export function loadProductData(): CreateProductRequest[] {
-  // Try loading pre-scraped data from JSON file first
   if (fs.existsSync(SCRAPED_DATA_PATH)) {
     try {
       const data = fs.readFileSync(SCRAPED_DATA_PATH, 'utf-8');
       const products = JSON.parse(data) as CreateProductRequest[];
       if (products.length > 0) {
-        console.log(`📂 Loaded ${products.length} products from scraped data file`);
+        console.log(`Loaded ${products.length} products from scraped file`);
         return products;
       }
     } catch (err) {
-      console.log('⚠️  Failed to parse scraped data file:', (err as Error).message);
+      console.log('Failed to parse scraped data:', (err as Error).message);
     }
   }
 
-  // Fall back to synthetic data for immediate startup
-  console.log('🔄 Using synthetic data for immediate startup...');
+  // no scraped data, generate synthetic
+  console.log('Using synthetic data...');
   const syntheticProducts = generateAllProducts();
-  console.log(`✅ Generated ${syntheticProducts.length} synthetic products`);
+  console.log(`Generated ${syntheticProducts.length} products`);
   return syntheticProducts;
 }
 
+// saves products to json file
 export function saveScrapedData(products: CreateProductRequest[]): void {
   try {
     const dataDir = path.dirname(SCRAPED_DATA_PATH);
@@ -37,13 +38,13 @@ export function saveScrapedData(products: CreateProductRequest[]): void {
     }
     fs.writeFileSync(SCRAPED_DATA_PATH, JSON.stringify(products, null, 2));
   } catch (err) {
-    console.log('⚠️  Failed to save scraped data:', (err as Error).message);
+    console.log('Failed to save scraped data:', (err as Error).message);
   }
 }
 
+// runs scraper in background, adds products as they come
 export function startBackgroundScraping(): void {
-  console.log('\n🌐 Starting background scraping (non-blocking)...');
-  console.log('   Products will be added to catalog as they are scraped.\n');
+  console.log('Starting background scraping...');
   
   scrapeProductsIncremental({
     onProduct: (product) => {
@@ -51,12 +52,12 @@ export function startBackgroundScraping(): void {
     },
     onBatchComplete: (products, total) => {
       saveScrapedData(products);
-      console.log(`💾 Saved ${total} scraped products to JSON`);
+      console.log(`Saved ${total} scraped products`);
     },
     onComplete: (products) => {
       saveScrapedData(products);
-      console.log(`\n✅ Background scraping complete: ${products.length} products saved`);
-      console.log(`📊 Total products in catalog: ${productStore.count()}`);
+      console.log(`Scraping done: ${products.length} products`);
+      console.log(`Total in catalog: ${productStore.count()}`);
     },
   });
 }

@@ -4,9 +4,8 @@ import Fuse from 'fuse.js';
 
 export class RankingService {
   
-  // Calculate overall ranking score for a product given a query
+  // main scoring function - combines all factors
   calculateScore(product: Product, queryIntent: QueryIntent, textScore: number): number {
-    // Base scores (0-100 scale)
     const textRelevance = textScore * 100;
     const ratingScore = this.calculateRatingScore(product);
     const popularityScore = this.calculatePopularityScore(product);
@@ -15,7 +14,7 @@ export class RankingService {
     const recencyScore = this.calculateRecencyScore(product);
     const discountScore = this.calculateDiscountScore(product);
     
-    // Weighted combination
+    // weighted sum of all scores
     let score = 
       (textRelevance * RANKING_WEIGHTS.textRelevance) +
       (ratingScore * RANKING_WEIGHTS.rating) +
@@ -25,100 +24,90 @@ export class RankingService {
       (recencyScore * RANKING_WEIGHTS.recency) +
       (discountScore * RANKING_WEIGHTS.discount);
     
-    // Apply penalties
     score -= this.calculatePenalties(product);
-    
-    // Apply intent-based boosts
     score += this.calculateIntentBoost(product, queryIntent);
     
-    // Ensure score is within bounds
+    // clamp between 0-100
     return Math.max(0, Math.min(100, score));
   }
 
-  // Rating score: considers both rating value and number of ratings
+  // uses bayesian average so products with few ratings dont get unfair advantage
   private calculateRatingScore(product: Product): number {
-    if (product.ratingCount === 0) return 30; // Default for unrated products
+    if (product.ratingCount === 0) return 30;
     
-    // Bayesian average to handle products with few ratings
-    const C = 100; // Minimum ratings threshold
-    const m = 3.5; // Prior mean rating
+    // bayesian avg formula from wikipedia lol
+    const C = 100; // min ratings needed
+    const m = 3.5; // prior mean
     
     const bayesianRating = 
       (product.ratingCount * product.rating + C * m) / (product.ratingCount + C);
     
-    // Scale to 0-100
     return (bayesianRating / 5) * 100;
   }
 
-  // Popularity score: based on units sold
+  // log scale so bestsellers dont completely dominate
   private calculatePopularityScore(product: Product): number {
-    // Logarithmic scale to prevent runaway scores for bestsellers
     const maxExpectedSales = 100000;
     const normalizedSales = Math.min(product.unitsSold, maxExpectedSales) / maxExpectedSales;
     
-    // Use logarithmic scale
     const logScore = Math.log10(1 + normalizedSales * 9) / Math.log10(10);
     
     return logScore * 100;
   }
 
-  // Price score: considers discount and value proposition
+  // price scoring based on user intent
   private calculatePriceScore(product: Product, queryIntent: QueryIntent): number {
     const { intents } = queryIntent;
     
-    // If user wants cheap products, lower price = higher score
+    // user wants cheap stuff
     if (intents.isCheap) {
-      // Inverse relationship - cheaper is better
       const maxPrice = 200000;
       const normalizedPrice = Math.min(product.price, maxPrice) / maxPrice;
       return (1 - normalizedPrice) * 100;
     }
     
-    // If user wants expensive/premium products, higher price = higher score
+    // user wants premium/expensive
     if (intents.isExpensive) {
       const maxPrice = 200000;
       const normalizedPrice = Math.min(product.price, maxPrice) / maxPrice;
       return normalizedPrice * 100;
     }
     
-    // If price range specified, check if product fits
+    // specific price range given
     if (intents.priceRange) {
       const { min, max } = intents.priceRange;
       
       if (max && product.price <= max) {
-        // Prefer products closer to max (better value at higher price)
         return (product.price / max) * 100;
       }
       
       if (min && max && product.price >= min && product.price <= max) {
-        return 100; // Perfect match
+        return 100;
       }
       
-      // Outside range - penalize
-      return 20;
+      return 20; // outside range
     }
     
-    // Default: prefer mid-range products with good discounts
+    // default - just use discount %
     const discountPercent = ((product.mrp - product.price) / product.mrp) * 100;
     return Math.min(discountPercent * 2, 100);
   }
 
-  // Stock score: in-stock products rank higher
+  // higher stock = higher score
   private calculateStockScore(product: Product): number {
     if (product.stock === 0) return 0;
-    if (product.stock < 5) return 30;  // Low stock
-    if (product.stock < 20) return 60; // Medium stock
-    if (product.stock < 100) return 80; // Good stock
-    return 100; // Excellent stock
+    if (product.stock < 5) return 30;
+    if (product.stock < 20) return 60;
+    if (product.stock < 100) return 80;
+    return 100;
   }
 
-  // Recency score: newer products get a boost
+  // newer products get slight boost
   private calculateRecencyScore(product: Product): number {
     const now = new Date();
     const productDate = new Date(product.createdAt);
     const daysSinceCreation = (now.getTime() - productDate.getTime()) / (1000 * 60 * 60 * 24);
     
-    // Products added in last 30 days get full score
     if (daysSinceCreation <= 30) return 100;
     if (daysSinceCreation <= 90) return 70;
     if (daysSinceCreation <= 180) return 50;
@@ -126,51 +115,48 @@ export class RankingService {
     return 10;
   }
 
-  // Discount score: better discounts rank higher
   private calculateDiscountScore(product: Product): number {
     const discountPercent = ((product.mrp - product.price) / product.mrp) * 100;
     return Math.min(discountPercent * 2, 100);
   }
 
-  // Calculate penalties for poor product metrics
+  // penalize bad products
   private calculatePenalties(product: Product): number {
     let penalty = 0;
     
-    // Out of stock penalty
     if (product.stock === 0) {
       penalty += PENALTY_FACTORS.outOfStock * 50;
     }
     
-    // High return rate penalty (above 5%)
+    // return rate above 5% is bad
     if (product.returnRate > 5) {
       penalty += (product.returnRate - 5) * PENALTY_FACTORS.highReturnRate * 10;
     }
     
-    // Complaints penalty (above 10 complaints)
+    // too many complaints
     if (product.complaints > 10) {
       penalty += (product.complaints - 10) * PENALTY_FACTORS.complaints * 10;
     }
     
-    return Math.min(penalty, 30); // Cap penalty at 30 points
+    return Math.min(penalty, 30);
   }
 
-  // Calculate boost based on query intent matching
+  // boost score if product matches what user is looking for
   private calculateIntentBoost(product: Product, queryIntent: QueryIntent): number {
     let boost = 0;
     const { intents } = queryIntent;
     const metadata = product.metadata;
     
-    // Color match boost
+    // color match
     if (intents.color && metadata.color) {
       if (metadata.color.toLowerCase() === intents.color.toLowerCase()) {
         boost += 15;
       }
     }
     
-    // Storage match boost
+    // storage match
     if (intents.storage) {
       if (intents.storage === 'high') {
-        // Boost products with higher storage
         const storage = metadata.storage?.replace(/[^0-9]/g, '');
         if (storage) {
           const storageNum = parseInt(storage);
@@ -182,21 +168,21 @@ export class RankingService {
       }
     }
     
-    // Brand match boost
+    // brand match
     if (intents.brand && metadata.brand) {
       if (metadata.brand.toLowerCase() === intents.brand.toLowerCase()) {
         boost += 10;
       }
     }
     
-    // Category match boost
+    // category match
     if (intents.category && metadata.category) {
       if (metadata.category.toLowerCase() === intents.category.toLowerCase()) {
         boost += 10;
       }
     }
     
-    // Latest model boost
+    // latest model keywords
     if (intents.isLatest) {
       const latestModels = ['16', '15', '24', '14', '13', 'pro', 'ultra', 'max', 'plus'];
       const titleLower = product.title.toLowerCase();
@@ -208,7 +194,7 @@ export class RankingService {
     return boost;
   }
 
-  // Perform fuzzy text matching and return normalized score (0-1)
+  // fuzzy search using fuse.js
   performTextMatch(products: Product[], queryIntent: QueryIntent): Map<number, number> {
     const scores = new Map<number, number>();
     const searchTerms = queryIntent.tokens.join(' ');

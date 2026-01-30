@@ -5,32 +5,25 @@ import { rankingService } from './ranking.service';
 
 export class SearchService {
   
-  // Main search function
   search(searchQuery: SearchQuery): { results: SearchResult[]; total: number; queryInfo: QueryIntent } {
     const startTime = Date.now();
     
-    // Step 1: Process the query (Hinglish, spelling, intents)
+    // process query - fix typos, translate hinglish etc
     const queryIntent = queryProcessor.processQuery(searchQuery.query);
     
-    // Step 2: Get all products
     let products = productStore.getAll();
-    
-    // Step 3: Apply filters
     products = this.applyFilters(products, searchQuery, queryIntent);
     
-    // Step 4: Rank products
+    // rank and sort
     const rankedProducts = rankingService.rankProducts(products, queryIntent);
-    
-    // Step 5: Apply sorting if specified (overrides ranking)
     const sortedProducts = this.applySorting(rankedProducts, searchQuery.sortBy);
     
-    // Step 6: Paginate
+    // paginate
     const page = searchQuery.page || 1;
     const limit = searchQuery.limit || 20;
     const start = (page - 1) * limit;
     const paginatedProducts = sortedProducts.slice(start, start + limit);
     
-    // Step 7: Transform to search results
     const results = paginatedProducts.map(product => this.toSearchResult(product));
     
     const endTime = Date.now();
@@ -43,33 +36,30 @@ export class SearchService {
     };
   }
 
-  // Apply filters based on search query and intents
+  // filter products based on query params and detected intents
   private applyFilters(products: Product[], searchQuery: SearchQuery, queryIntent: QueryIntent): Product[] {
     let filtered = products;
     
-    // Category filter
+    // category
     if (searchQuery.category) {
-      // Explicit category filter from query params
       filtered = filtered.filter(p => 
         p.metadata.category?.toLowerCase() === searchQuery.category!.toLowerCase()
       );
     } else if (queryIntent.intents.category === 'accessory') {
-      // For accessory searches (cover, charger, etc.), apply category filter
+      // accessories are filtered strictly
       filtered = filtered.filter(p => 
         p.metadata.category?.toLowerCase() === 'accessory'
       );
     }
-    // Note: For phone/laptop categories detected from brand names, we use ranking boost instead
     
-    // Brand filter - only apply if explicitly set in search params, otherwise use for ranking boost
+    // brand filter
     if (searchQuery.brand) {
       filtered = filtered.filter(p => 
         p.metadata.brand?.toLowerCase() === searchQuery.brand!.toLowerCase()
       );
     }
-    // Note: queryIntent.intents.brand is used for ranking boost, not filtering
     
-    // Price range filter
+    // price range
     const priceRange = queryIntent.intents.priceRange;
     if (searchQuery.minPrice !== undefined) {
       filtered = filtered.filter(p => p.price >= searchQuery.minPrice!);
@@ -83,23 +73,20 @@ export class SearchService {
       filtered = filtered.filter(p => p.price <= priceRange.max!);
     }
     
-    // Rating filter
+    // rating
     if (searchQuery.minRating !== undefined) {
       filtered = filtered.filter(p => p.rating >= searchQuery.minRating!);
     }
     
-    // Stock filter
+    // stock
     if (searchQuery.inStock === true) {
       filtered = filtered.filter(p => p.stock > 0);
     }
     
-    // Color filter from intent
+    // color - soft filter, put matching colors first but keep others
     if (queryIntent.intents.color) {
-      // Don't strictly filter, but this will be used in ranking boost
-      // Only filter if explicitly searching for a color
       const colorInQuery = queryIntent.processedQuery.includes(queryIntent.intents.color);
       if (colorInQuery) {
-        // Soft filter: prioritize matching colors but include others
         const colorMatches = filtered.filter(p => 
           p.metadata.color?.toLowerCase() === queryIntent.intents.color?.toLowerCase() ||
           p.title.toLowerCase().includes(queryIntent.intents.color!)
@@ -115,10 +102,9 @@ export class SearchService {
     return filtered;
   }
 
-  // Apply explicit sorting (overrides relevance ranking)
   private applySorting(products: Product[], sortBy?: string): Product[] {
     if (!sortBy || sortBy === 'relevance') {
-      return products; // Already sorted by relevance
+      return products;
     }
     
     const sorted = [...products];

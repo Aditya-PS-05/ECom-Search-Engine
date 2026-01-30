@@ -269,7 +269,7 @@ export async function scrapeProductsIncremental(callbacks: ScrapeCallbacks): Pro
         callbacks.onBatchComplete?.(allProducts, allProducts.length);
       }
 
-      console.log(`  📦 ${query} (page ${page}): ${allProducts.length} scraped products`);
+      console.log(`  ${query} (page ${page}): ${allProducts.length} products`);
       await delay(randomInt(300, 600));
     }
   }

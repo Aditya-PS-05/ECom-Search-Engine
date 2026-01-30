@@ -90,18 +90,16 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   });
 });
 
-// Initialize data synchronously for instant startup
+// loads products into memory on startup
 export function initializeData(): void {
-  console.log('🚀 Initializing product catalog...');
-  console.log('   1) Load from scraped JSON or synthetic data (instant)');
-  console.log('   2) Background scraping adds more products in real-time\n');
+  console.log('Loading product catalog...');
   
   const products = loadProductData();
   productStore.bulkAdd(products);
   
-  console.log(`✅ Loaded ${productStore.count()} products into catalog`);
+  console.log(`Loaded ${productStore.count()} products`);
   
-  // Start background scraping (non-blocking)
+  // start scraping in background if enabled
   if (process.env.ENABLE_SCRAPING !== 'false') {
     startBackgroundScraping();
   }
