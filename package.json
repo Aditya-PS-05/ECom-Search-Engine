@@ -1,14 +1,17 @@
 {
-  "name": "jumbotail-test",
+  "name": "ecommerce-search-engine",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "E-Commerce Search Engine with intelligent ranking for electronics products",
+  "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "test": "echo \"Tests pending\" && exit 0"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["ecommerce", "search", "ranking", "electronics"],
+  "author": "Aditya",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

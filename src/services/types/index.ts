@@ -13,9 +13,6 @@ export interface ProductMetadata {
   connectivity?: string;
   material?: string;
   warranty?: string;
-  type?: string;
-  compatibility?: string;
-  waterResistance?: string;
   [key: string]: string | undefined;
 }
 
@@ -64,7 +61,7 @@ export interface SearchQuery {
   brand?: string;
   minRating?: number;
   inStock?: boolean;
-  sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'rating' | 'newest' | 'popularity' | 'discount';
+  sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'rating' | 'newest';
   page?: number;
   limit?: number;
 }
