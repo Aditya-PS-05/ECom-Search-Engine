@@ -23,11 +23,26 @@ export class SearchController {
         limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
       };
       
-      // Validate query
+      // Handle empty query - return trending products
       if (!searchQuery.query || searchQuery.query.trim().length === 0) {
-        res.status(400).json({
-          success: false,
-          error: 'Search query is required',
+        const trending = searchService.getTrending(searchQuery.limit || 20);
+        const endTime = Date.now();
+        
+        res.status(200).json({
+          data: trending,
+          pagination: {
+            page: 1,
+            limit: searchQuery.limit || 20,
+            total: trending.length,
+            totalPages: 1,
+          },
+          queryInfo: {
+            originalQuery: '',
+            processedQuery: '',
+            intents: { isCheap: false, isExpensive: false, isLatest: false },
+            note: 'Empty query - showing trending products',
+          },
+          latencyMs: endTime - startTime,
         });
         return;
       }
