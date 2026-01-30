@@ -55,13 +55,13 @@ export class SearchService {
       );
     }
     
-    // Brand filter
-    const brand = searchQuery.brand || queryIntent.intents.brand;
-    if (brand) {
+    // Brand filter - only apply if explicitly set in search params, otherwise use for ranking boost
+    if (searchQuery.brand) {
       filtered = filtered.filter(p => 
-        p.metadata.brand?.toLowerCase() === brand.toLowerCase()
+        p.metadata.brand?.toLowerCase() === searchQuery.brand!.toLowerCase()
       );
     }
+    // Note: queryIntent.intents.brand is used for ranking boost, not filtering
     
     // Price range filter
     const priceRange = queryIntent.intents.priceRange;

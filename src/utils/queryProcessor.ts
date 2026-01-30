@@ -167,8 +167,13 @@ export class QueryProcessor {
   // Extract storage requirement from query
   private extractStorage(query: string): string | undefined {
     // Check for "more storage" or "high storage" intent
-    if (query.includes('more storage') || query.includes('high storage') || 
-        query.includes('maximum storage') || query.includes('max storage')) {
+    const highStoragePatterns = [
+      'more storage', 'high storage', 'maximum storage', 'max storage',
+      'bigger storage', 'large storage', 'highest storage', 'most storage',
+      'zyada storage', 'bada storage' // Hinglish
+    ];
+    
+    if (highStoragePatterns.some(pattern => query.includes(pattern))) {
       return 'high';
     }
     
@@ -229,7 +234,16 @@ export class QueryProcessor {
 
   // Extract category from query
   private extractCategory(query: string): string | undefined {
+    // Check accessory keywords first (they're more specific)
+    const accessoryKeywords = ['cover', 'case', 'charger', 'cable', 'adapter', 
+                               'screen guard', 'tempered glass', 'power bank', 'protector'];
+    if (accessoryKeywords.some(kw => query.includes(kw))) {
+      return 'accessory';
+    }
+    
+    // Then check other categories
     for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+      if (category === 'accessory') continue; // Already checked
       for (const keyword of keywords) {
         if (query.includes(keyword)) {
           return category;
@@ -242,15 +256,21 @@ export class QueryProcessor {
 
   // Tokenize query for search
   private tokenize(query: string): string[] {
-    // Remove common stop words
+    // Remove common stop words and intent words (they shouldn't be searched as text)
     const stopWords = ['a', 'an', 'the', 'is', 'are', 'was', 'were', 'for', 'of', 
                        'to', 'in', 'on', 'with', 'and', 'or', 'i', 'want', 'need',
                        'looking', 'search', 'find', 'show', 'me', 'please'];
     
+    // Intent words - these are used for ranking, not text matching
+    const intentWords = ['cheap', 'budget', 'affordable', 'expensive', 'premium',
+                         'latest', 'new', 'best', 'good', 'top', 'under', 'below',
+                         'rupees', 'rs', 'price', 'color', 'colour', 'more', 'storage'];
+    
     const tokens = query
       .split(/\s+/)
       .filter(token => token.length > 1)
-      .filter(token => !stopWords.includes(token));
+      .filter(token => !stopWords.includes(token))
+      .filter(token => !intentWords.includes(token));
     
     return tokens;
   }
