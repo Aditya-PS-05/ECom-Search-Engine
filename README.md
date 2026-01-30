@@ -9,7 +9,8 @@ Search engine for an electronics e-commerce platform. Built for the JumboTail as
 - Ranks results based on ratings, popularity, price, stock etc
 - Scrapes products from Flipkart and Amazon
 
-## How to run
+## How to run 
+> scrapper will be automatically run and will be used. 
 
 ```bash
 npm install
@@ -32,6 +33,10 @@ To just run the scraper:
 ```bash
 npm run scrape
 ```
+
+## LLM Conversation
+https://ampcode.com/threads/T-019c0f19-1395-77f2-8596-1b4867b51c3a
+https://ampcode.com/threads/T-019c0ef2-2628-7459-a274-01c01e37e0b9
 
 ## APIs
 
@@ -102,20 +107,6 @@ Penalties applied for:
 - High return rate
 - Too many complaints
 
-## Project structure
-
-```
-src/
-  controllers/     - request handlers
-  services/        - business logic
-    search.service.ts    - main search logic
-    ranking.service.ts   - scoring algorithm
-    scraperService.ts    - web scraper
-  models/          - data store
-  utils/           - query processing, constants
-  data/            - seed data generator
-  types/           - typescript interfaces
-```
 
 ## Tech used
 
@@ -126,8 +117,7 @@ src/
 
 ## Notes
 
-- Default: in-memory storage (fast, no setup)
-- Optional: SQLite database with USE_DB=true (persists across restarts)
+- Database: in-memory storage (fast, no setup) and SQLite database with USE_DB=true (persists across restarts)
 - Scraper runs in background on startup
 - Scraped data saved to JSON for next restart
 - All APIs respond in under 100ms
