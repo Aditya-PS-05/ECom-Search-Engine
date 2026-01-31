@@ -21,6 +21,7 @@ export class SearchController {
         sortBy: req.query.sortBy as SearchQuery['sortBy'],
         page: req.query.page ? parseInt(req.query.page as string) : 1,
         limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
+        userId: req.query.userId as string, // for repeat purchase personalization
       };
       
       // Handle empty query - return trending products

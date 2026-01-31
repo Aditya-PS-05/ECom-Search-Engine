@@ -21,4 +21,8 @@ router.get('/products/categories', (req, res) => productController.getCategories
 router.get('/products/brands', (req, res) => productController.getBrands(req, res));
 router.get('/products/count', (req, res) => productController.getProductCount(req, res));
 
+// Purchase history (for repeat purchase feature)
+router.post('/purchase', (req, res) => productController.recordPurchase(req, res));
+router.get('/purchases/:userId', (req, res) => productController.getUserPurchases(req, res));
+
 export default router;

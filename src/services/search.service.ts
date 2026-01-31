@@ -1,5 +1,6 @@
 import { Product, SearchQuery, SearchResult, QueryIntent } from '../types';
 import { productStore } from '../models/productStore';
+import { purchaseHistoryStore } from '../models/purchaseHistory';
 import { queryProcessor } from '../utils/queryProcessor';
 import { rankingService } from './ranking.service';
 
@@ -14,9 +15,9 @@ export class SearchService {
     let products = productStore.getAll();
     products = this.applyFilters(products, searchQuery, queryIntent);
     
-    // rank and sort
-    const rankedProducts = rankingService.rankProducts(products, queryIntent);
-    const sortedProducts = this.applySorting(rankedProducts, searchQuery.sortBy);
+    // rank and sort - now returns products with scores (userId for repeat purchase boost)
+    const rankedProductsWithScores = rankingService.rankProductsWithScores(products, queryIntent, searchQuery.userId);
+    const sortedProducts = this.applySortingWithScores(rankedProductsWithScores, searchQuery.sortBy);
     
     // paginate
     const page = searchQuery.page || 1;
@@ -24,7 +25,9 @@ export class SearchService {
     const start = (page - 1) * limit;
     const paginatedProducts = sortedProducts.slice(start, start + limit);
     
-    const results = paginatedProducts.map(product => this.toSearchResult(product));
+    const results = paginatedProducts.map(({ product, score }) => 
+      this.toSearchResult(product, score, searchQuery.userId)
+    );
     
     const endTime = Date.now();
     console.log(`Search completed in ${endTime - startTime}ms for query: "${searchQuery.query}"`);
@@ -102,7 +105,10 @@ export class SearchService {
     return filtered;
   }
 
-  private applySorting(products: Product[], sortBy?: string): Product[] {
+  private applySortingWithScores(
+    products: Array<{ product: Product; score: number }>,
+    sortBy?: string
+  ): Array<{ product: Product; score: number }> {
     if (!sortBy || sortBy === 'relevance') {
       return products;
     }
@@ -111,30 +117,29 @@ export class SearchService {
     
     switch (sortBy) {
       case 'price_asc':
-        sorted.sort((a, b) => a.price - b.price);
+        sorted.sort((a, b) => a.product.price - b.product.price);
         break;
       case 'price_desc':
-        sorted.sort((a, b) => b.price - a.price);
+        sorted.sort((a, b) => b.product.price - a.product.price);
         break;
       case 'rating':
         sorted.sort((a, b) => {
-          // Sort by rating, then by rating count for tie-breaking
-          if (b.rating !== a.rating) return b.rating - a.rating;
-          return b.ratingCount - a.ratingCount;
+          if (b.product.rating !== a.product.rating) return b.product.rating - a.product.rating;
+          return b.product.ratingCount - a.product.ratingCount;
         });
         break;
       case 'newest':
         sorted.sort((a, b) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          new Date(b.product.createdAt).getTime() - new Date(a.product.createdAt).getTime()
         );
         break;
       case 'popularity':
-        sorted.sort((a, b) => b.unitsSold - a.unitsSold);
+        sorted.sort((a, b) => b.product.unitsSold - a.product.unitsSold);
         break;
       case 'discount':
         sorted.sort((a, b) => {
-          const discountA = (a.mrp - a.price) / a.mrp;
-          const discountB = (b.mrp - b.price) / b.mrp;
+          const discountA = (a.product.mrp - a.product.price) / a.product.mrp;
+          const discountB = (b.product.mrp - b.product.price) / b.product.mrp;
           return discountB - discountA;
         });
         break;
@@ -144,7 +149,11 @@ export class SearchService {
   }
 
   // Transform Product to SearchResult
-  private toSearchResult(product: Product): SearchResult {
+  private toSearchResult(product: Product, score?: number, userId?: string): SearchResult {
+    const repeatPurchaseCount = userId 
+      ? purchaseHistoryStore.getPurchaseCount(userId, product.productId) 
+      : undefined;
+
     return {
       productId: product.productId,
       title: product.title,
@@ -155,6 +164,8 @@ export class SearchService {
       stock: product.stock,
       rating: product.rating,
       ratingCount: product.ratingCount,
+      score: score !== undefined ? Math.round(score * 100) / 100 : undefined,
+      repeatPurchaseCount: repeatPurchaseCount || undefined,
     };
   }
 

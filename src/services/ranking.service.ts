@@ -1,11 +1,12 @@
 import { Product, QueryIntent } from '../types';
-import { RANKING_WEIGHTS, PENALTY_FACTORS } from '../utils/constants';
+import { RANKING_WEIGHTS, PENALTY_FACTORS, REPEAT_PURCHASE_BOOST } from '../utils/constants';
+import { purchaseHistoryStore } from '../models/purchaseHistory';
 import Fuse from 'fuse.js';
 
 export class RankingService {
   
   // main scoring function - combines all factors
-  calculateScore(product: Product, queryIntent: QueryIntent, textScore: number): number {
+  calculateScore(product: Product, queryIntent: QueryIntent, textScore: number, userId?: string): number {
     const textRelevance = textScore * 100;
     const ratingScore = this.calculateRatingScore(product);
     const popularityScore = this.calculatePopularityScore(product);
@@ -26,9 +27,24 @@ export class RankingService {
     
     score -= this.calculatePenalties(product);
     score += this.calculateIntentBoost(product, queryIntent);
+    score += this.calculateRepeatPurchaseBoost(product, userId);
     
     // clamp between 0-100
     return Math.max(0, Math.min(100, score));
+  }
+
+  // Boost for products user has previously purchased
+  private calculateRepeatPurchaseBoost(product: Product, userId?: string): number {
+    if (!userId) return 0;
+
+    const purchaseCount = purchaseHistoryStore.getPurchaseCount(userId, product.productId);
+    if (purchaseCount === 0) return 0;
+
+    // Base boost + additional boost per repeat purchase, capped at max
+    const boost = REPEAT_PURCHASE_BOOST.baseBoost + 
+      (purchaseCount - 1) * REPEAT_PURCHASE_BOOST.perPurchaseBoost;
+    
+    return Math.min(boost, REPEAT_PURCHASE_BOOST.maxBoost);
   }
 
   // uses bayesian average so products with few ratings dont get unfair advantage
@@ -232,7 +248,12 @@ export class RankingService {
   }
 
   // Rank products based on query
-  rankProducts(products: Product[], queryIntent: QueryIntent): Product[] {
+  rankProducts(products: Product[], queryIntent: QueryIntent, userId?: string): Product[] {
+    return this.rankProductsWithScores(products, queryIntent, userId).map(p => p.product);
+  }
+
+  // Rank products and return with scores
+  rankProductsWithScores(products: Product[], queryIntent: QueryIntent, userId?: string): Array<{ product: Product; score: number }> {
     // Get text matching scores
     const textScores = this.performTextMatch(products, queryIntent);
     
@@ -244,7 +265,7 @@ export class RankingService {
       
       // Only include products that matched text search (or if no search terms)
       if (textScore !== undefined) {
-        const finalScore = this.calculateScore(product, queryIntent, textScore);
+        const finalScore = this.calculateScore(product, queryIntent, textScore, userId);
         scoredProducts.push({ product, score: finalScore });
       }
     }
@@ -253,7 +274,7 @@ export class RankingService {
     scoredProducts.sort((a, b) => b.score - a.score);
     
     // Apply post-ranking adjustments
-    return this.applyPostRankingRules(scoredProducts, queryIntent);
+    return this.applyPostRankingRulesWithScores(scoredProducts, queryIntent);
   }
 
   // Apply business rules after initial ranking
@@ -261,6 +282,14 @@ export class RankingService {
     scoredProducts: Array<{ product: Product; score: number }>,
     queryIntent: QueryIntent
   ): Product[] {
+    return this.applyPostRankingRulesWithScores(scoredProducts, queryIntent).map(sp => sp.product);
+  }
+
+  // Apply business rules after initial ranking (preserves scores)
+  private applyPostRankingRulesWithScores(
+    scoredProducts: Array<{ product: Product; score: number }>,
+    queryIntent: QueryIntent
+  ): Array<{ product: Product; score: number }> {
     // Rule 1: Never show out-of-stock products in top 10 unless very relevant
     const inStock = scoredProducts.filter(p => p.product.stock > 0);
     const outOfStock = scoredProducts.filter(p => p.product.stock === 0);
@@ -283,7 +312,7 @@ export class RankingService {
       // This is already handled in intent boost
     }
     
-    return reordered.map(sp => sp.product);
+    return reordered;
   }
 }
 

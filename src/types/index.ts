@@ -67,6 +67,7 @@ export interface SearchQuery {
   sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'rating' | 'newest' | 'popularity' | 'discount';
   page?: number;
   limit?: number;
+  userId?: string; // for personalized ranking (repeat purchase boost)
 }
 
 export interface SearchResult {
@@ -80,6 +81,7 @@ export interface SearchResult {
   rating: number;
   ratingCount: number;
   score?: number;
+  repeatPurchaseCount?: number; // how many times user purchased this product
 }
 
 export interface QueryIntent {

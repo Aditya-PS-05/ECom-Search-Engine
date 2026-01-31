@@ -128,6 +128,13 @@ export const RANKING_WEIGHTS = {
   discount: 0.05,
 };
 
+// Repeat purchase boost settings
+export const REPEAT_PURCHASE_BOOST = {
+  baseBoost: 25,        // base boost for previously purchased products
+  maxBoost: 40,         // max boost for frequent repurchases
+  perPurchaseBoost: 5,  // additional boost per repeat purchase
+};
+
 // Penalty factors
 export const PENALTY_FACTORS = {
   outOfStock: 0.5,

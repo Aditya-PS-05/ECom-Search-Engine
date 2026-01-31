@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { productService } from '../services/product.service';
+import { purchaseHistoryStore } from '../models/purchaseHistory';
 import { CreateProductRequest, UpdateMetadataRequest } from '../types';
 
 export class ProductController {
@@ -241,6 +242,60 @@ export class ProductController {
     try {
       const count = productService.getProductCount();
       res.status(200).json({ count });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
+    }
+  }
+
+  // POST /api/v1/purchase - Record a purchase for repeat purchase feature
+  recordPurchase(req: Request, res: Response): void {
+    try {
+      const { userId, productId } = req.body;
+
+      if (!userId || !productId) {
+        res.status(400).json({
+          success: false,
+          error: 'userId and productId are required',
+        });
+        return;
+      }
+
+      purchaseHistoryStore.addPurchase(userId, productId);
+
+      res.status(201).json({
+        success: true,
+        message: 'Purchase recorded successfully',
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
+    }
+  }
+
+  // GET /api/v1/purchases/:userId - Get user's purchase history
+  getUserPurchases(req: Request, res: Response): void {
+    try {
+      const userId = req.params.userId;
+
+      if (!userId) {
+        res.status(400).json({
+          success: false,
+          error: 'userId is required',
+        });
+        return;
+      }
+
+      const purchases = purchaseHistoryStore.getUserPurchases(userId as string);
+
+      res.status(200).json({
+        success: true,
+        data: purchases,
+      });
     } catch (error) {
       res.status(500).json({
         success: false,
